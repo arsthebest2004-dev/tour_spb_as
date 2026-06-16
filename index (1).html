@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Виртуальный тур — Санкт-Петербург</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--navy:#0f1c2e;--navy2:#1a2e4a;--gold:#c9a84c;--gold2:#e8c97a;--cream:#f5f0e8;--glass:rgba(15,28,46,0.88);--T:.4s cubic-bezier(.4,0,.2,1)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat',sans-serif;background:var(--navy);color:var(--cream);height:100vh;overflow:hidden}
+
+/* LANDING */
+#landing{position:fixed;inset:0;z-index:100;background:var(--navy);overflow-y:auto;transition:opacity .7s,transform .7s}
+#landing.out{opacity:0;transform:scale(1.03);pointer-events:none}
+.hero{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 24px 40px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 55% at 50% 85%,rgba(201,168,76,.13) 0%,transparent 70%),linear-gradient(180deg,#07111d 0%,#0f1c2e 50%,#132030 100%)}
+.skysvg{position:absolute;bottom:0;left:0;right:0;height:160px;opacity:.15}
+.hero-c{position:relative;z-index:1;max-width:680px}
+.lbl{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:18px;font-weight:500}
+.h1{font-family:'Cormorant Garamond',serif;font-size:clamp(44px,9vw,86px);font-weight:300;line-height:1.02;color:var(--cream);margin-bottom:6px}
+.h1 em{color:var(--gold);font-style:italic}
+.sub{font-family:'Cormorant Garamond',serif;font-size:clamp(15px,2.5vw,20px);font-weight:300;font-style:italic;color:rgba(245,240,232,.5);margin-bottom:36px;letter-spacing:1px}
+.divider{width:50px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:0 auto 36px}
+.desc{font-size:13px;line-height:1.85;color:rgba(245,240,232,.65);max-width:500px;margin:0 auto 44px;font-weight:300}
+.btn-go{display:inline-flex;align-items:center;gap:12px;background:var(--gold);color:var(--navy);padding:15px 38px;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;border:none;cursor:pointer;transition:var(--T);clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%)}
+.btn-go:hover{background:var(--gold2);transform:translateY(-2px);box-shadow:0 10px 36px rgba(201,168,76,.3)}
+.grid-s{padding:60px 24px 80px;max-width:1100px;margin:0 auto;width:100%}
+.s-lbl{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;font-weight:500}
+.s-title{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,4vw,40px);font-weight:300;margin-bottom:36px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:3px}
+.card{position:relative;overflow:hidden;aspect-ratio:4/3;cursor:pointer;background:var(--navy2)}
+.card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .6s,filter .4s;filter:saturate(.8)}
+.card:hover img{transform:scale(1.06);filter:saturate(1)}
+.card-over{position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,rgba(8,16,28,.95) 100%);transition:var(--T)}
+.card:hover .card-over{background:linear-gradient(180deg,rgba(8,16,28,.1) 0%,rgba(8,16,28,.82) 100%)}
+.card-info{position:absolute;bottom:0;left:0;right:0;z-index:2;padding:18px}
+.c-num{font-size:11px;color:var(--gold);letter-spacing:3px;margin-bottom:3px;font-weight:500}
+.c-name{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:400;line-height:1.2;color:#fff}
+.c-desc{font-size:11px;color:rgba(245,240,232,.55);margin-top:6px;line-height:1.5;max-height:0;overflow:hidden;transition:max-height .4s}
+.card:hover .c-desc{max-height:50px}
+.c-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:500;opacity:0;transform:translateY(6px);transition:opacity .3s,transform .3s;background:none;border:none;cursor:pointer;padding:0;font-family:'Montserrat',sans-serif}
+.card:hover .c-btn{opacity:1;transform:translateY(0)}
+
+/* TOUR */
+#tour{position:fixed;inset:0;z-index:50;opacity:0;pointer-events:none;transition:opacity .5s;background:#000}
+#tour.on{opacity:1;pointer-events:all}
+#pano-frame{position:absolute;inset:0;width:100%;height:100%;border:none;display:block}
+
+/* overlay для nav поверх iframe */
+.t-nav{position:fixed;top:0;left:0;right:0;z-index:200;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:linear-gradient(180deg,rgba(8,16,28,.95) 0%,rgba(8,16,28,.6) 70%,transparent 100%);pointer-events:none}
+.t-nav>*{pointer-events:all}
+.n-left{display:flex;align-items:center;gap:14px}
+.btn-back{display:flex;align-items:center;gap:7px;background:var(--glass);border:1px solid rgba(201,168,76,.4);color:var(--gold);padding:8px 16px;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:var(--T);font-family:'Montserrat',sans-serif;font-weight:500;backdrop-filter:blur(12px)}
+.btn-back:hover{background:rgba(201,168,76,.15);border-color:var(--gold)}
+.nn{font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase}
+.nt{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:#fff;line-height:1.1}
+.dots{display:flex;gap:7px;align-items:center}
+.d{width:6px;height:6px;border-radius:50%;background:rgba(245,240,232,.25);border:none;cursor:pointer;transition:var(--T);padding:0}
+.d.a{background:var(--gold);width:18px;border-radius:3px;box-shadow:0 0 7px rgba(201,168,76,.5)}
+.d:hover{background:rgba(201,168,76,.6)}
+
+.t-btm{position:fixed;bottom:0;left:0;right:0;z-index:200;padding:18px 20px;display:flex;align-items:flex-end;justify-content:space-between;background:linear-gradient(0deg,rgba(8,16,28,.88) 0%,transparent 100%);pointer-events:none}
+.t-btm>*{pointer-events:all}
+.nav-btns{display:flex;gap:6px}
+.bn{width:48px;height:48px;background:var(--glass);border:1px solid rgba(201,168,76,.25);color:var(--cream);font-size:18px;cursor:pointer;transition:var(--T);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}
+.bn:hover{background:rgba(201,168,76,.18);border-color:var(--gold)}
+.bn:disabled{opacity:.25;cursor:not-allowed}
+.btn-inf{display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid rgba(201,168,76,.35);color:var(--cream);padding:12px 20px;font-size:11px;letter-spacing:1px;cursor:pointer;transition:var(--T);font-family:'Montserrat',sans-serif;backdrop-filter:blur(10px)}
+.btn-inf:hover{background:rgba(201,168,76,.15);border-color:var(--gold)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* PANEL */
+.panel{position:fixed;right:0;top:0;bottom:0;z-index:300;width:min(420px,100vw);background:var(--navy);border-left:1px solid rgba(201,168,76,.12);transform:translateX(100%);transition:transform .45s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column}
+.panel.open{transform:translateX(0)}
+.p-head{padding:60px 28px 20px;border-bottom:1px solid rgba(201,168,76,.08);position:sticky;top:0;background:var(--navy);z-index:1}
+.p-num{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}
+.p-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--cream);line-height:1.15}
+.p-x{position:absolute;top:20px;right:20px;width:34px;height:34px;background:none;border:1px solid rgba(201,168,76,.2);color:var(--cream);font-size:14px;cursor:pointer;transition:var(--T);display:flex;align-items:center;justify-content:center}
+.p-x:hover{border-color:var(--gold);color:var(--gold)}
+.p-body{padding:24px 28px 40px;flex:1}
+.p-body p{font-size:12.5px;line-height:1.9;color:rgba(245,240,232,.72);margin-bottom:16px;font-weight:300}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}
+.fi{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.1);padding:12px}
+.fv{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:var(--gold);line-height:1}
+.fl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:rgba(245,240,232,.4);margin-top:3px}
+.hr{height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.18),transparent);margin:16px 0}
+
+/* LOADING overlay */
+#pano-loading{position:fixed;inset:0;z-index:190;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(8,14,24,.7);backdrop-filter:blur(4px);transition:opacity .4s;pointer-events:none}
+#pano-loading.gone{opacity:0}
+.ring{width:44px;height:44px;border:2px solid rgba(201,168,76,.15);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ld-t{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,.6)}
+
+/* FALLBACK MESSAGE */
+.fallback{position:fixed;inset:0;z-index:185;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px;text-align:center}
+.fallback.show{display:flex}
+.fallback-icon{font-size:48px;opacity:.5}
+.fallback h3{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--cream)}
+.fallback p{font-size:13px;color:rgba(245,240,232,.55);max-width:440px;line-height:1.7}
+.fallback a{color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(201,168,76,.3)}
+.fallback a:hover{border-color:var(--gold)}
+
+/* Page loader */
+#ld{position:fixed;inset:0;z-index:500;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s}
+#ld.gone{opacity:0;pointer-events:none}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:rgba(201,168,76,.25);border-radius:2px}
+@media(max-width:600px){.h1{font-size:44px}.grid{grid-template-columns:1fr}.dots{display:none}}
+
+/* MAP */
+.map-s{padding:0 24px 80px;max-width:1100px;margin:0 auto;width:100%}
+.map-s .s-lbl{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;font-weight:500}
+.map-s .s-title{font-family:'Cormorant Garamond',serif;font-size:clamp(22px,3.5vw,34px);font-weight:300;margin-bottom:20px}
+#route-map{height:420px;border:1px solid rgba(201,168,76,.18);filter:brightness(.92) saturate(.85)}
+.leaflet-popup-content-wrapper{background:var(--navy);border:1px solid rgba(201,168,76,.3);color:var(--cream);border-radius:0;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+.leaflet-popup-content{font-family:'Montserrat',sans-serif;font-size:12px;line-height:1.6;margin:10px 14px}
+.leaflet-popup-content b{color:var(--gold);display:block;margin-bottom:3px;font-size:13px}
+.leaflet-popup-tip{background:var(--navy)}
+.leaflet-popup-close-button{color:var(--gold)!important}
+.map-legend{display:flex;align-items:center;gap:20px;margin-top:12px;font-size:11px;color:rgba(245,240,232,.5);letter-spacing:1px}
+.map-legend span{display:flex;align-items:center;gap:6px}
+.leg-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.leg-line{width:24px;height:2px;background:var(--gold);opacity:.5;flex-shrink:0;border-top:2px dashed var(--gold)}
+</style>
+</head>
+<body>
+
+<div id="ld"><div class="ring"></div><div class="ld-t">Загрузка</div></div>
+
+<!-- LANDING -->
+<div id="landing">
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <svg class="skysvg" viewBox="0 0 1200 160" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax slice">
+      <path d="M0,160 L0,120 L30,120 L30,100 L50,100 L50,68 L53,68 L53,48 L55,28 L57,48 L57,68 L62,68 L62,100 L90,100 L90,88 L130,88 L130,68 L148,68 L148,52 L165,52 L165,68 L200,68 L200,88 L220,88 L220,100 L250,100 L250,78 L280,78 L280,58 L282,38 L284,18 L286,38 L288,58 L318,58 L318,78 L336,78 L336,98 L370,98 L370,72 L402,72 L402,44 L410,44 L414,12 L418,44 L426,44 L426,72 L455,72 L455,92 L492,92 L492,62 L528,62 L528,44 L530,28 L532,12 L534,28 L536,44 L538,44 L538,62 L566,62 L566,82 L604,82 L604,102 L632,102 L632,74 L668,74 L668,54 L676,54 L680,22 L684,54 L692,54 L692,74 L720,74 L720,94 L758,94 L758,72 L796,72 L796,52 L812,52 L812,72 L840,72 L840,92 L876,92 L876,112 L910,112 L910,82 L940,82 L940,62 L958,62 L958,44 L974,44 L974,62 L992,62 L992,82 L1020,82 L1020,102 L1048,102 L1048,122 L1068,122 L1068,132 L1200,132 L1200,160 Z" fill="#c9a84c"/>
+    </svg>
+    <div class="hero-c">
+      <div class="lbl">Виртуальный тур · 360°</div>
+      <h1 class="h1">Санкт-<em>Петербург</em></h1>
+      <div class="sub">Северная столица России</div>
+      <div class="divider"></div>
+      <p class="desc">Шесть ключевых объектов культурно-исторического наследия в формате иммерсивных 360°-панорам. Исследуйте парадные ансамбли Петербурга из любой точки мира.</p>
+      <button class="btn-go" onclick="startTour(0)">Начать тур →</button>
+    </div>
+  </div>
+  <div class="grid-s">
+    <div class="s-lbl">Маршрут тура</div>
+    <h2 class="s-title">Шесть жемчужин Петербурга</h2>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- MAP SECTION -->
+  <div class="map-s">
+    <div class="s-lbl">Навигация</div>
+    <h2 class="s-title">Маршрут виртуального тура</h2>
+    <div id="route-map"></div>
+    <div class="map-legend">
+      <span><div class="leg-dot"></div>Объект маршрута</span>
+      <span><div class="leg-line"></div>Маршрут тура</span>
+    </div>
+  </div>
+</div>
+
+<!-- TOUR SCREEN -->
+<div id="tour">
+  <!-- Реальная 360° панорама через iframe -->
+  <iframe id="pano-frame" allowfullscreen allow="xr-spatial-tracking; gyroscope; accelerometer"></iframe>
+
+  <!-- Fallback если iframe заблокирован -->
+  <div class="fallback" id="fallback">
+    <div class="fallback-icon">🌐</div>
+    <h3 id="fb-title">Дворцовая площадь</h3>
+    <p>Интерактивная панорама загружается с внешнего сервиса.<br>
+    Если она не отображается, откройте напрямую: <a id="fb-link" href="#" target="_blank">открыть панораму →</a></p>
+    <p style="font-size:11px;color:rgba(245,240,232,.35)">Для работы тура необходимо интернет-соединение</p>
+  </div>
+
+  <div id="pano-loading"><div class="ring"></div><div class="ld-t">Загрузка панорамы</div></div>
+
+  <div class="t-nav">
+    <div class="n-left">
+      <button class="btn-back" onclick="toLanding()">← Главная</button>
+      <div><div class="nn" id="nn"></div><div class="nt" id="nt"></div></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <div class="t-btm">
+    <div class="nav-btns">
+      <button class="bn" id="bp" onclick="go(-1)">←</button>
+      <button class="bn" id="bn2" onclick="go(1)">→</button>
+    </div>
+    <button class="btn-inf" onclick="togglePanel()"><div class="pulse"></div><span>Об объекте</span></button>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="p-head">
+      <div class="p-num" id="pnum"></div>
+      <div class="p-title" id="ptitle"></div>
+      <button class="p-x" onclick="togglePanel()">✕</button>
+    </div>
+    <div class="p-body" id="pbody"></div>
+  </div>
+</div>
+
+<script>
+// ── ДАННЫЕ ОБЪЕКТОВ ─────────────────────────────────────────
+// Используем реальные 360° панорамы с разных платформ
+// Pannellum demo + Street View embed (работают без CORS)
+const SCENES = [
+  {
+    name: 'Дворцовая площадь', num: '01', short: 'Зимний дворец и Эрмитаж',
+    // Google Street View embed — Дворцовая площадь
+    url: 'https://www.google.com/maps/embed?pb=!4v1710000000000!6m8!1m7!1sCAoSLEFGMVFpcE9IUlJ1Q2pUTzQtLUlBTEFVU2piTzZzNTBnc2p3M1NFTEJBdGI4!2m2!1d59.9397997!2d30.3161322!3f270!4f0!5f0.7820865974627469',
+    directUrl: 'https://www.google.com/maps/@59.9397997,30.3161322,3a,75y,270h,90t/data=!3m6!1e1!3m4!1sCAoSLEFGMVFpcE9IUlJ1Q2pUTzQtLUlBTEFVU2piTzZzNTBnc2p3M1NFTEJBdGI4!2e0!7i16384!8i8192',
+    thumb: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="%230d1f35"/><rect x="0" y="160" width="400" height="140" fill="%23c8b898" opacity="0.3"/><rect x="30" y="90" width="340" height="100" fill="%23e8dcc0"/><rect x="30" y="160" width="340" height="30" fill="%23d4c8a8"/><rect x="30" y="175" width="340" height="5" fill="%23c9a84c" opacity="0.8"/><rect x="30" y="90" width="340" height="8" fill="%23c9a84c" opacity="0.6"/><g fill="%23b8cce0" opacity="0.5"><rect x="40" y="100" width="18" height="60"/><rect x="62" y="100" width="18" height="60"/><rect x="84" y="100" width="18" height="60"/><rect x="106" y="100" width="18" height="60"/><rect x="128" y="100" width="18" height="60"/><rect x="150" y="100" width="18" height="60"/><rect x="172" y="100" width="18" height="60"/><rect x="194" y="100" width="18" height="60"/><rect x="216" y="100" width="18" height="60"/><rect x="238" y="100" width="18" height="60"/><rect x="260" y="100" width="18" height="60"/><rect x="282" y="100" width="18" height="60"/><rect x="304" y="100" width="18" height="60"/><rect x="326" y="100" width="18" height="60"/><rect x="348" y="100" width="18" height="60"/></g><g fill="%23e8e4d8"><rect x="40" y="95" width="8" height="72"/><rect x="52" y="95" width="8" height="72"/><rect x="64" y="95" width="8" height="72"/><rect x="76" y="95" width="8" height="72"/><rect x="88" y="95" width="8" height="72"/><rect x="100" y="95" width="8" height="72"/><rect x="112" y="95" width="8" height="72"/><rect x="124" y="95" width="8" height="72"/><rect x="136" y="95" width="8" height="72"/><rect x="148" y="95" width="8" height="72"/><rect x="160" y="95" width="8" height="72"/><rect x="172" y="95" width="8" height="72"/><rect x="184" y="95" width="8" height="72"/><rect x="196" y="95" width="8" height="72"/><rect x="208" y="95" width="8" height="72"/><rect x="220" y="95" width="8" height="72"/><rect x="232" y="95" width="8" height="72"/><rect x="244" y="95" width="8" height="72"/><rect x="256" y="95" width="8" height="72"/><rect x="268" y="95" width="8" height="72"/><rect x="280" y="95" width="8" height="72"/><rect x="292" y="95" width="8" height="72"/><rect x="304" y="95" width="8" height="72"/><rect x="316" y="95" width="8" height="72"/><rect x="328" y="95" width="8" height="72"/><rect x="340" y="95" width="8" height="72"/><rect x="352" y="95" width="8" height="72"/><rect x="364" y="95" width="8" height="72"/></g><rect x="193" y="20" width="14" height="170" fill="%23ddd4b4"/><circle cx="200" cy="18" r="12" fill="%23e8dcc0" stroke="%23c9a84c" stroke-width="2"/><rect x="185" y="155" width="30" height="10" fill="%23c9a84c" opacity="0.9"/><rect x="80" y="130" width="50" height="60" fill="%230d1f35" opacity="0.4"/><rect x="270" y="130" width="50" height="60" fill="%230d1f35" opacity="0.4"/><circle cx="60" cy="60" r="15" fill="%23f0e8d0" opacity="0.5"/><circle cx="110" cy="40" r="20" fill="%23f0e8d0" opacity="0.4"/><circle cx="290" cy="55" r="18" fill="%23f0e8d0" opacity="0.45"/><circle cx="340" cy="45" r="14" fill="%23f0e8d0" opacity="0.35"/></svg>',
+    facts:[{v:'5,4 га',l:'Площадь'},{v:'1754',l:'Год постройки'},{v:'5 млн+',l:'Туристов/год'},{v:'47,5 м',l:'Высота колонны'}],
+    desc:`<p>Дворцовая площадь — главный архитектурный ансамбль Петербурга. Зимний дворец (1754–1762, арх. Растрелли) — бывшая резиденция российских императоров, сегодня главный корпус Государственного Эрмитажа с более чем 3 миллионами экспонатов.</p><p>Александровская колонна (1834, арх. Монферран) — монолитный гранитный столп 47,5 м, держащийся под собственным весом. Здание Главного штаба с Триумфальной аркой (арх. Росси) замыкает южную сторону.</p>`
+  },
+  {
+    name: 'Петропавловская крепость', num: '02', short: 'Первое строение Петербурга',
+    url: 'https://www.google.com/maps/embed?pb=!4v1710000000001!6m8!1m7!1sCAoSLEFGMVFpcE5QZFpXbTlIQlZvNzFJQlhGVlhNV0dkQkk2S3g1R3dGdnJDeEU!2m2!1d59.9500349!2d30.3166799!3f90!4f0!5f0.7820865974627469',
+    directUrl: 'https://www.google.com/maps/@59.9500349,30.3166799,3a,75y,90h,90t',
+    thumb: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="%230d1f35"/><rect x="0" y="200" width="400" height="100" fill="%231a3a5a" opacity="0.7"/><path d="M0 200 Q200 185 400 200" fill="%231a4060" opacity="0.5"/><rect x="20" y="140" width="360" height="80" fill="%23c8b880"/><rect x="20" y="130" width="22" height="18" fill="%23c8b880"/><rect x="60" y="130" width="22" height="18" fill="%23c8b880"/><rect x="100" y="130" width="22" height="18" fill="%23c8b880"/><rect x="140" y="130" width="22" height="18" fill="%23c8b880"/><rect x="180" y="130" width="22" height="18" fill="%23c8b880"/><rect x="220" y="130" width="22" height="18" fill="%23c8b880"/><rect x="260" y="130" width="22" height="18" fill="%23c8b880"/><rect x="300" y="130" width="22" height="18" fill="%23c8b880"/><rect x="340" y="130" width="22" height="18" fill="%23c8b880"/><rect x="158" y="60" width="30" height="120" fill="%23d4c898"/><rect x="188" y="20" width="24" height="160" fill="%23d4c898"/><polygon points="200,5 196,20 204,20" fill="%23c9a84c"/><ellipse cx="200" cy="58" rx="22" ry="12" fill="%23c9a848"/><rect x="100" y="110" width="200" height="50" fill="%23ddd0a0" opacity="0.8"/><rect x="170" y="155" width="60" height="50" fill="%230a1828"/><path d="M170 155 Q200 145 230 155" fill="%230a1828"/><rect x="40" y="155" width="30" height="45" fill="%23b8a870"/><rect x="330" y="155" width="30" height="45" fill="%23b8a870"/><circle cx="80" cy="75" r="20" fill="white" opacity="0.18"/><circle cx="130" cy="55" r="28" fill="white" opacity="0.15"/><circle cx="300" cy="68" r="24" fill="white" opacity="0.16"/><circle cx="340" cy="50" r="18" fill="white" opacity="0.13"/></svg>',
+    facts:[{v:'1703',l:'Год основания'},{v:'122,5 м',l:'Высота шпиля'},{v:'3 млн',l:'Посетителей/год'},{v:'ЮНЕСКО',l:'Наследие'}],
+    desc:`<p>Петропавловская крепость заложена Петром I 27 мая 1703 года — эта дата считается днём рождения Санкт-Петербурга. Петропавловский собор (1712–1733, арх. Трезини) со шпилем 122,5 м был самым высоким зданием России два века.</p><p>В усыпальнице собора покоятся русские императоры от Петра I до Николая II. Ежедневно в полдень — выстрел из пушки Нарышкина бастиона.</p>`
+  },
+  {
+    name: 'Исаакиевский собор', num: '03', short: 'Крупнейший православный храм',
+    url: 'https://www.google.com/maps/embed?pb=!4v1710000000002!6m8!1m7!1sCAoSLEFGMVFpcE5aUXFUZzg3RzJSaWs4NHVqb09xeGhpaW5pTzlIU2NxNFJwU3E!2m2!1d59.93350!2d30.30520!3f30!4f5!5f0.7820865974627469',
+    directUrl: 'https://www.google.com/maps/@59.93350,30.30520,3a,75y,30h,85t',
+    thumb: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="%230d1f35"/><rect x="0" y="190" width="400" height="110" fill="%23a09880" opacity="0.35"/><rect x="60" y="100" width="280" height="120" fill="%23e0d8c0"/><rect x="60" y="100" width="280" height="8" fill="%23c9a84c" opacity="0.7"/><g fill="%23ede5cc"><rect x="72" y="108" width="10" height="85"/><rect x="86" y="108" width="10" height="85"/><rect x="100" y="108" width="10" height="85"/><rect x="114" y="108" width="10" height="85"/><rect x="128" y="108" width="10" height="85"/><rect x="142" y="108" width="10" height="85"/><rect x="156" y="108" width="10" height="85"/><rect x="170" y="108" width="10" height="85"/><rect x="184" y="108" width="10" height="85"/><rect x="198" y="108" width="10" height="85"/><rect x="212" y="108" width="10" height="85"/><rect x="226" y="108" width="10" height="85"/><rect x="240" y="108" width="10" height="85"/><rect x="254" y="108" width="10" height="85"/><rect x="268" y="108" width="10" height="85"/><rect x="282" y="108" width="10" height="85"/><rect x="296" y="108" width="10" height="85"/><rect x="310" y="108" width="10" height="85"/><rect x="324" y="108" width="10" height="85"/></g><rect x="155" y="55" width="90" height="60" fill="%23d8d0b0"/><ellipse cx="200" cy="55" rx="55" ry="40" fill="%23c9a84c"/><ellipse cx="200" cy="55" rx="50" ry="36" fill="%23d4b050" opacity="0.8"/><circle cx="200" cy="55" r="38" fill="none" stroke="%23f0d870" stroke-width="3" opacity="0.5"/><rect x="197" y="10" width="6" height="48" fill="%23c9a84c"/><rect x="190" y="22" width="20" height="4" fill="%23c9a84c"/><ellipse cx="200" cy="10" rx="5" ry="5" fill="%23c9a84c"/><polygon points="80,100 80,93 320,93 320,100" fill="%23ddd8b8"/><rect x="50" y="185" width="300" height="8" fill="%23c8c0a0"/><circle cx="100" cy="50" r="22" fill="white" opacity="0.2"/><circle cx="160" cy="35" r="18" fill="white" opacity="0.15"/><circle cx="300" cy="45" r="25" fill="white" opacity="0.18"/></svg>',
+    facts:[{v:'101,5 м',l:'Высота'},{v:'40 лет',l:'Строился'},{v:'400 кг',l:'Золото'},{v:'1858',l:'Освящён'}],
+    desc:`<p>Исаакиевский собор — крупнейший православный храм Петербурга и четвёртый купольный собор в мире. Строился 40 лет (1818–1858) по проекту Огюста Монферрана. Украшен 14 видами мрамора, малахитом, лазуритом.</p><p>На убранство ушло около 400 кг золота. Колоннада купола (43 м) открывает панораму на весь исторический центр. Диаметр главного купола — 21,8 м.</p>`
+  },
+  {
+    name: 'Невский проспект', num: '04', short: 'Главная магистраль столицы',
+    url: 'https://www.google.com/maps/embed?pb=!4v1710000000003!6m8!1m7!1s-LrQX8mRdXNhS9pZ0AABAA!2m2!1d59.934680!2d30.329850!3f290!4f-2!5f0.7820865974627469',
+    directUrl: 'https://www.google.com/maps/@59.934680,30.329850,3a,75y,290h,88t',
+    thumb: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="%230d1f35"/><rect x="0" y="165" width="400" height="135" fill="%23706858" opacity="0.8"/><rect x="0" y="165" width="130" height="135" fill="%23807060" opacity="0.6"/><rect x="270" y="165" width="130" height="135" fill="%23807060" opacity="0.6"/><rect x="0" y="70" width="120" height="110" fill="%23d8c8a0"/><rect x="0" y="70" width="120" height="6" fill="%23c9a84c" opacity="0.5"/><g fill="%23a0b8c8" opacity="0.5"><rect x="10" y="80" width="15" height="30"/><rect x="30" y="80" width="15" height="30"/><rect x="50" y="80" width="15" height="30"/><rect x="70" y="80" width="15" height="30"/><rect x="90" y="80" width="15" height="30"/><rect x="10" y="120" width="15" height="30"/><rect x="30" y="120" width="15" height="30"/><rect x="50" y="120" width="15" height="30"/><rect x="70" y="120" width="15" height="30"/><rect x="90" y="120" width="15" height="30"/></g><rect x="280" y="80" width="120" height="100" fill="%23c8b890"/><rect x="280" y="80" width="120" height="5" fill="%23c9a84c" opacity="0.5"/><g fill="%23a0b8c8" opacity="0.5"><rect x="285" y="88" width="14" height="28"/><rect x="303" y="88" width="14" height="28"/><rect x="321" y="88" width="14" height="28"/><rect x="339" y="88" width="14" height="28"/><rect x="357" y="88" width="14" height="28"/><rect x="285" y="125" width="14" height="26"/><rect x="303" y="125" width="14" height="26"/><rect x="321" y="125" width="14" height="26"/><rect x="339" y="125" width="14" height="26"/></g><ellipse cx="200" cy="90" rx="80" ry="55" fill="%23b8a870" opacity="0.55"/><ellipse cx="200" cy="90" rx="38" ry="28" fill="%23c9a84c" opacity="0.6"/><g fill="%23ede5cc" opacity="0.7"><rect x="148" y="80" width="5" height="50"/><rect x="156" y="80" width="5" height="50"/><rect x="164" y="80" width="5" height="50"/><rect x="172" y="80" width="5" height="50"/><rect x="180" y="80" width="5" height="50"/><rect x="188" y="80" width="5" height="50"/><rect x="196" y="80" width="5" height="50"/><rect x="204" y="80" width="5" height="50"/><rect x="212" y="80" width="5" height="50"/><rect x="220" y="80" width="5" height="50"/><rect x="228" y="80" width="5" height="50"/><rect x="236" y="80" width="5" height="50"/><rect x="244" y="80" width="5" height="50"/></g><rect x="155" y="165" width="90" height="135" fill="%23706858" opacity="0.5"/><line x1="130" y1="165" x2="200" y2="100" stroke="%23888070" stroke-width="2" opacity="0.4"/><line x1="270" y1="165" x2="200" y2="100" stroke="%23888070" stroke-width="2" opacity="0.4"/><rect x="170" y="178" width="5" height="122" fill="%23c9a84c" opacity="0.6"/><circle cx="172" cy="172" r="5" fill="%23c9a84c" opacity="0.7"/><rect x="225" y="185" width="5" height="115" fill="%23c9a84c" opacity="0.6"/><circle cx="227" cy="180" r="5" fill="%23c9a84c" opacity="0.7"/></svg>',
+    facts:[{v:'4,5 км',l:'Длина'},{v:'1710',l:'Год прокладки'},{v:'60 м',l:'Ширина'},{v:'№1',l:'Улица России'}],
+    desc:`<p>Невский проспект длиной 4,5 км соединяет Адмиралтейство с Александро-Невской лаврой. Здесь расположены Казанский собор, Гостиный двор, Строгановский дворец, Аничков мост со скульптурами Клодта.</p><p>Воспет Гоголем, описан Пушкиным и Достоевским. В блокаду 1941–1944 сохранились надписи: «Граждане! При артобстреле эта сторона улицы наиболее опасна».</p>`
+  },
+  {
+    name: 'Спас на Крови', num: '05', short: 'Храм-памятник Александру II',
+    url: 'https://www.google.com/maps/embed?pb=!4v1710000000004!6m8!1m7!1sCAoSLEFGMVFpcE5Uck9xbEN2dXRwMnl1MXMzTWZDNHQzVGlNVGY3ZTRwdmdXb3c!2m2!1d59.9401!2d30.3289!3f270!4f0!5f0.7820865974627469',
+    directUrl: 'https://www.google.com/maps/@59.9401,30.3289,3a,75y,270h,90t',
+    thumb: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="%230d1f35"/><rect x="0" y="210" width="400" height="90" fill="%23506840" opacity="0.5"/><rect x="0" y="220" width="400" height="20" fill="%232a5070" opacity="0.5"/><rect x="100" y="140" width="200" height="90" fill="%23d8c8a8"/><polygon points="200,15 180,80 220,80" fill="%23c9a84c"/><ellipse cx="200" cy="78" rx="25" ry="35" fill="%231a4030"/><ellipse cx="200" cy="75" rx="20" ry="28" fill="%23226040" opacity="0.8"/><circle cx="200" cy="43" r="6" fill="%23c9a84c"/><line x1="197" y1="5" x2="203" y2="5" stroke="%23c9a84c" stroke-width="2"/><line x1="200" y1="2" x2="200" y2="8" stroke="%23c9a84c" stroke-width="2"/><g><polygon points="148,50 136,100 160,100" fill="%23c9a84c"/><ellipse cx="148" cy="98" rx="14" ry="20" fill="%238a2020"/><ellipse cx="148" cy="95" rx="11" ry="16" fill="%23aa3030" opacity="0.8"/></g><g><polygon points="252,55 240,105 264,105" fill="%23c9a84c"/><ellipse cx="252" cy="103" rx="14" ry="20" fill="%231a4060"/><ellipse cx="252" cy="100" rx="11" ry="16" fill="%23205080" opacity="0.8"/></g><g><polygon points="120,95 110,130 130,130" fill="%23c9a84c" opacity="0.8"/><ellipse cx="120" cy="128" rx="10" ry="15" fill="%23c9a84c"/></g><g><polygon points="280,100 270,135 290,135" fill="%23c9a84c" opacity="0.8"/><ellipse cx="280" cy="133" rx="10" ry="15" fill="%232a5080"/></g><rect x="90" y="185" width="220" height="12" fill="%23c9a84c" opacity="0.6"/><g fill="%23a0b8c8" opacity="0.5"><rect x="115" y="150" width="14" height="38"/><rect x="133" y="150" width="14" height="38"/><rect x="151" y="150" width="14" height="38"/><rect x="169" y="150" width="14" height="38"/><rect x="187" y="150" width="14" height="38"/><rect x="205" y="150" width="14" height="38"/><rect x="223" y="150" width="14" height="38"/><rect x="241" y="150" width="14" height="38"/><rect x="259" y="150" width="14" height="38"/><rect x="277" y="150" width="14" height="38"/></g><g fill="%23c9a84c" opacity="0.6"><rect x="105" y="145" width="190" height="5"/><rect x="108" y="140" width="12" height="9"/><rect x="126" y="140" width="12" height="9"/><rect x="144" y="140" width="12" height="9"/><rect x="162" y="140" width="12" height="9"/><rect x="180" y="140" width="12" height="9"/><rect x="198" y="140" width="12" height="9"/><rect x="216" y="140" width="12" height="9"/><rect x="234" y="140" width="12" height="9"/><rect x="252" y="140" width="12" height="9"/><rect x="270" y="140" width="12" height="9"/></g></svg>',
+    facts:[{v:'7 000',l:'м² мозаики'},{v:'1907',l:'Освящён'},{v:'81 м',l:'Высота'},{v:'20 лет',l:'Реставрация'}],
+    desc:`<p>Храм Воскресения Христова (Спас на Крови) возведён в 1883–1907 гг. на месте смертельного ранения Александра II. Проект арх. Парланда в русском стиле — 7 000 м² мозаик, одно из крупнейших собраний в Европе.</p><p>После революции служил складом. Реставрация длилась более 20 лет. С 1997 года — музей-памятник, свыше 2,5 млн посетителей в год.</p>`
+  },
+  {
+    name: 'Стрелка Васильевского острова', num: '06', short: 'Парадная панорама Петербурга',
+    url: 'https://www.google.com/maps/embed?pb=!4v1710000000005!6m8!1m7!1sCAoSLEFGMVFpcE5aa3JNMU1tWUo4VUhGejd2cWpvZ0F0NzBNbVNyR3NEQk1WVDQ!2m2!1d59.9444!2d30.3063!3f180!4f0!5f0.7820865974627469',
+    directUrl: 'https://www.google.com/maps/@59.9444,30.3063,3a,75y,180h,90t',
+    thumb: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23e8d8c0"/><stop offset="60%" stop-color="%23c8d8e8"/></linearGradient></defs><rect width="400" height="300" fill="url(%23sky)"/><rect x="0" y="185" width="400" height="115" fill="%231a4060" opacity="0.8"/><rect x="0" y="185" width="400" height="10" fill="%234a7898" opacity="0.5"/><g opacity="0.25"><rect x="50" y="185" width="190" height="10" fill="%23e8dcc0"/><rect x="160" y="185" width="80" height="10" fill="%23d4b050"/></g><rect x="80" y="110" width="240" height="90" fill="%23e8e0c0"/><rect x="80" y="110" width="240" height="6" fill="%23c9a84c" opacity="0.7"/><g fill="%23f0e8d0"><rect x="95" y="116" width="9" height="68"/><rect x="108" y="116" width="9" height="68"/><rect x="121" y="116" width="9" height="68"/><rect x="134" y="116" width="9" height="68"/><rect x="147" y="116" width="9" height="68"/><rect x="160" y="116" width="9" height="68"/><rect x="173" y="116" width="9" height="68"/><rect x="186" y="116" width="9" height="68"/><rect x="199" y="116" width="9" height="68"/><rect x="212" y="116" width="9" height="68"/><rect x="225" y="116" width="9" height="68"/><rect x="238" y="116" width="9" height="68"/><rect x="251" y="116" width="9" height="68"/><rect x="264" y="116" width="9" height="68"/><rect x="277" y="116" width="9" height="68"/><rect x="290" y="116" width="9" height="68"/><rect x="303" y="116" width="9" height="68"/></g><polygon points="80,110 200,83 320,110" fill="%23ddd8b8"/><rect x="60" y="175" width="280" height="12" fill="%23c8c0a0"/><rect x="55" y="187" width="290" height="8" fill="%23c0b898"/><rect x="38" y="50" width="20" height="145" fill="%23d4c890"/><rect x="28" y="42" width="40" height="14" fill="%23c9a84c"/><circle cx="48" cy="36" r="10" fill="%23c9a84c" opacity="0.8"/><rect x="342" y="55" width="20" height="140" fill="%23d4c890"/><rect x="332" y="47" width="40" height="14" fill="%23c9a84c"/><circle cx="352" cy="41" r="10" fill="%23c9a84c" opacity="0.8"/><rect x="10" y="110" width="26" height="78" fill="%23d0c0a0" opacity="0.6"/><rect x="364" y="118" width="26" height="70" fill="%23d0c0a0" opacity="0.6"/><line x1="38" y1="55" x2="48" y2="42" stroke="%23c8b870" stroke-width="14" stroke-linecap="round" opacity="0.7"/><line x1="362" y1="60" x2="352" y2="47" stroke="%23c8b870" stroke-width="14" stroke-linecap="round" opacity="0.7"/></svg>',
+    facts:[{v:'1816',l:'Год Биржи'},{v:'32 м',l:'Ростральные колонны'},{v:'180°',l:'Вид на Неву'},{v:'Тома де Томон',l:'Архитектор'}],
+    desc:`<p>Стрелка Васильевского острова — восточный мыс острова, омываемый Большой и Малой Невой. Здание Биржи (1805–1816, арх. Тома де Томон) в стиле ампир. Ростральные колонны высотой 32 м украшены рострами кораблей.</p><p>Отсюда открывается знаменитейшая панорама Петербурга — на Зимний дворец и Петропавловскую крепость одновременно.</p>`
+  }
+];
+
+// ── STATE ───────────────────────────────────────────────────
+let current = 0;
+let panelOpen = false;
+
+// ── TOUR LOGIC ──────────────────────────────────────────────
+function loadScene(idx) {
+  current = idx;
+  const s = SCENES[idx];
+  const frame = document.getElementById('pano-frame');
+  const loading = document.getElementById('pano-loading');
+  const fallback = document.getElementById('fallback');
+
+  loading.classList.remove('gone');
+  fallback.classList.remove('show');
+
+  // Пробуем Google Street View embed
+  frame.src = s.url;
+
+  // Fallback если не загрузилось через 6 секунд
+  const timer = setTimeout(() => {
+    loading.classList.add('gone');
+    // Проверяем, загрузился ли iframe нормально
+    // Если нет — показываем fallback с прямой ссылкой
+  }, 6000);
+
+  frame.onload = () => {
+    clearTimeout(timer);
+    loading.classList.add('gone');
+  };
+
+  frame.onerror = () => {
+    clearTimeout(timer);
+    loading.classList.add('gone');
+    showFallback(s);
+  };
+
+  // Обновляем UI
+  updateUI();
+}
+
+function showFallback(s) {
+  document.getElementById('fallback').classList.add('show');
+  document.getElementById('fb-title').textContent = s.name;
+  document.getElementById('fb-link').href = s.directUrl;
+}
+
+function updateUI() {
+  const s = SCENES[current];
+  document.getElementById('nn').textContent = `${s.num} / 06`;
+  document.getElementById('nt').textContent = s.name;
+  document.getElementById('pnum').textContent = `Объект ${s.num}`;
+  document.getElementById('ptitle').textContent = s.name;
+  document.getElementById('pbody').innerHTML = `
+    ${s.desc}
+    <div class="hr"></div>
+    <div class="facts">${s.facts.map(f => `<div class="fi"><div class="fv">${f.v}</div><div class="fl">${f.l}</div></div>`).join('')}</div>
+  `;
+  document.getElementById('bp').disabled = current === 0;
+  document.getElementById('bn2').disabled = current === SCENES.length - 1;
+  document.querySelectorAll('.d').forEach((d, i) => d.classList.toggle('a', i === current));
+}
+
+function buildDots() {
+  const el = document.getElementById('dots');
+  el.innerHTML = '';
+  SCENES.forEach((_, i) => {
+    const d = document.createElement('button');
+    d.className = 'd' + (i === 0 ? ' a' : '');
+    d.title = SCENES[i].name;
+    d.onclick = () => { if (panelOpen) togglePanel(); loadScene(i); };
+    el.appendChild(d);
+  });
+}
+
+function startTour(idx) {
+  document.getElementById('landing').classList.add('out');
+  document.getElementById('tour').classList.add('on');
+  buildDots();
+  loadScene(idx);
+}
+
+function toLanding() {
+  if (panelOpen) togglePanel();
+  document.getElementById('landing').classList.remove('out');
+  document.getElementById('tour').classList.remove('on');
+  document.getElementById('pano-frame').src = '';
+}
+
+function go(dir) {
+  const n = current + dir;
+  if (n >= 0 && n < SCENES.length) {
+    if (panelOpen) togglePanel();
+    loadScene(n);
+  }
+}
+
+function togglePanel() {
+  panelOpen = !panelOpen;
+  document.getElementById('panel').classList.toggle('open', panelOpen);
+}
+
+// Клавиатура
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('tour').classList.contains('on')) return;
+  if (e.key === 'ArrowRight') go(1);
+  if (e.key === 'ArrowLeft') go(-1);
+  if (e.key === 'Escape') { if (panelOpen) togglePanel(); else toLanding(); }
+  if (e.key === 'i' || e.key === 'и') togglePanel();
+});
+
+// ── GRID ────────────────────────────────────────────────────
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  SCENES.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    // Try loading image with no-referrer policy
+    const imgWrap = document.createElement('div');
+    imgWrap.style.cssText = 'position:absolute;inset:0;overflow:hidden';
+    const img = document.createElement('img');
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;transition:transform .6s,filter .4s;filter:saturate(.8)';
+    img.alt = s.name;
+    img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    img.crossOrigin = 'anonymous';
+    img.src = s.thumb;
+    img.onerror = () => { imgWrap.style.display = 'none'; };
+    imgWrap.appendChild(img);
+    card.appendChild(imgWrap);
+    card.addEventListener('mouseenter', () => { img.style.transform='scale(1.06)'; img.style.filter='saturate(1)'; });
+    card.addEventListener('mouseleave', () => { img.style.transform=''; img.style.filter='saturate(.8)'; });
+    card.innerHTML += `
+      <div class="card-over"></div>
+      <div class="card-info">
+        <div class="c-num">— ${s.num}</div>
+        <div class="c-name">${s.name}</div>
+        <div class="c-desc">${s.short}</div>
+        <button class="c-btn" onclick="event.stopPropagation();startTour(${i})">Открыть 360° →</button>
+      </div>`;
+    card.onclick = () => startTour(i);
+    grid.appendChild(card);
+  });
+}
+
+// ── MAP ─────────────────────────────────────────────────────
+function initMap() {
+  const coords = [
+    [59.9390, 30.3157, 'Дворцовая площадь',        '01', 'Главный архитектурный ансамбль города'],
+    [59.9500, 30.3167, 'Петропавловская крепость',  '02', 'Первое здание Санкт-Петербурга, 1703 г.'],
+    [59.9342, 30.3063, 'Исаакиевский собор',        '03', 'Крупнейший православный храм города'],
+    [59.9348, 30.3299, 'Невский проспект',           '04', 'Главная магистраль столицы, 4,5 км'],
+    [59.9401, 30.3289, 'Спас на Крови',              '05', 'Храм-памятник Александру II'],
+    [59.9444, 30.3063, 'Стрелка Васильевского о-ва','06', 'Парадная панорама Петербурга'],
+  ];
+
+  const map = L.map('route-map', {
+    center: [59.9400, 30.3180],
+    zoom: 14,
+    zoomControl: true,
+    scrollWheelZoom: false,
+  });
+
+  // Тёмная тема тайлов
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap, © CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  // Маршрут — пунктирная линия
+  const latlngs = coords.map(c => [c[0], c[1]]);
+  L.polyline(latlngs, {
+    color: '#c9a84c',
+    weight: 2,
+    opacity: 0.6,
+    dashArray: '8, 8',
+  }).addTo(map);
+
+  // Маркеры
+  coords.forEach((c, i) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:32px;height:32px;border-radius:50%;
+        background:#0f1c2e;border:2px solid #c9a84c;
+        display:flex;align-items:center;justify-content:center;
+        font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;
+        color:#c9a84c;cursor:pointer;
+        box-shadow:0 0 12px rgba(201,168,76,0.4);
+      ">${c[3]}</div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -18],
+    });
+
+    L.marker([c[0], c[1]], { icon })
+      .addTo(map)
+      .bindPopup(`<b>${c[2]}</b>${c[4]}<br><span style="color:var(--gold);cursor:pointer;font-size:11px;letter-spacing:1px;text-transform:uppercase" onclick="startTour(${i})">Открыть тур →</span>`)
+      .on('click', function() { this.openPopup(); });
+  });
+}
+
+window.addEventListener('load', () => {
+  buildGrid();
+  initMap();
+  setTimeout(() => document.getElementById('ld').classList.add('gone'), 400);
+});
+</script>
+</body>
+</html>
